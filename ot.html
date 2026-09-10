@@ -14,10 +14,13 @@
   #msg { margin-top:14px; font-weight:600; }
   #notRegistered { display:none; text-align:center; }
   #notRegistered button { background:#2e7d32; }
+  #loading { text-align:center; color:#666; margin-top:40px; }
 </style>
 </head>
 <body>
   <h2>ลงเวลาทำงาน / ขอโอที</h2>
+
+  <div id="loading">กำลังโหลด กรุณารอสักครู่...</div>
 
   <div id="notRegistered">
     <p>คุณยังไม่ได้ลงทะเบียน กรุณาลงทะเบียนก่อนใช้งาน</p>
@@ -65,12 +68,14 @@
     return callApi('checkRegistered', { lineUserId: userId });
   }).then(function (reg) {
     if (!reg) return;
+    document.getElementById('loading').style.display = 'none';
     if (reg.registered) {
       document.getElementById('otForm').style.display = 'block';
     } else {
       document.getElementById('notRegistered').style.display = 'block';
     }
   }).catch(function (err) {
+    document.getElementById('loading').style.display = 'none';
     document.getElementById('msg').style.color = '#c62828';
     document.getElementById('msg').innerText = 'เกิดข้อผิดพลาด: ' + err;
   });
