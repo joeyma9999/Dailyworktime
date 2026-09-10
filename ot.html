@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  body { font-family: -apple-system, "Segoe UI", "Sarabun", sans-serif; padding: 20px; background:#f5f5f5; }
+  h2 { color:#1565c0; }
+  label { display:block; margin-top:14px; margin-bottom:4px; font-weight:600; color:#333; }
+  input { width:100%; padding:10px; border:1px solid #ccc; border-radius:8px; box-sizing:border-box; font-size:16px; }
+  button { margin-top:20px; width:100%; padding:12px; background:#1565c0; color:#fff; border:none; border-radius:8px; font-size:16px; }
+  button:disabled { background:#999; }
+  #msg { margin-top:14px; font-weight:600; }
+  #notRegistered { display:none; text-align:center; }
+  #notRegistered button { background:#2e7d32; }
+</style>
+</head>
+<body>
+  <h2>ลงเวลาทำงาน / ขอโอที</h2>
+
+  <div id="notRegistered">
+    <p>คุณยังไม่ได้ลงทะเบียน กรุณาลงทะเบียนก่อนใช้งาน</p>
+    <button onclick="goRegister()">ไปหน้าลงทะเบียน</button>
+  </div>
+
+  <form id="otForm" style="display:none">
+    <label>วันที่</label>
+    <input type="date" id="date" required>
+
+    <label>เวลาเริ่ม</label>
+    <input type="time" id="startTime" required>
+
+    <label>เวลาเลิก</label>
+    <input type="time" id="endTime" required>
+
+    <label>หน้าที่ที่ทำงาน</label>
+    <input type="text" id="duty" required>
+
+    <button type="submit" id="submitBtn">ส่งคำขอ</button>
+  </form>
+
+  <div id="msg"></div>
+
+<script>
+  var LIFF_ID = 'YOUR_LIFF_ID_OT';               // TODO: ใส่ LIFF ID ของหน้าลงเวลา
+  var API_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL';   // TODO: ใส่ Web app URL จาก Apps Script (…/exec) — อันเดียวกับใน register.html
+  var REGISTER_LIFF_URL = 'https://liff.line.me/YOUR_LIFF_ID_REGISTER'; // TODO
+  var userId = null;
+
+  function callApi(action, data) {
+    return fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: action, data: data })
+    }).then(function (res) { return res.json(); });
+  }
+
+  liff.init({ liffId: LIFF_ID }).then(function () {
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+    return liff.getProfile();
+  }).then(function (profile) {
+    if (!profile) return;
+    userId = profile.userId;
+    return callApi('checkRegistered', { lineUserId: userId });
+  }).then(function (reg) {
+    if (!reg) return;
+    if (reg.registered) {
+      document.getElementById('otForm').style.display = 'block';
+    } else {
+      document.getElementById('notRegistered').style.display = 'block';
+    }
+  }).catch(function (err) {
+    document.getElementById('msg').style.color = '#c62828';
+    document.getElementById('msg').innerText = 'เกิดข้อผิดพลาด: ' + err;
+  });
+
+  function goRegister() {
+    liff.openWindow({ url: REGISTER_LIFF_URL, external: false });
+  }
+
+  document.getElementById('otForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var msg = document.getElementById('msg');
+    var payload = {
+      lineUserId: userId,
+      date: document.getElementById('date').value,
+      startTime: document.getElementById('startTime').value,
+      endTime: document.getElementById('endTime').value,
+      duty: document.getElementById('duty').value
+    };
+
+    document.getElementById('submitBtn').disabled = true;
+    msg.style.color = '#333';
+    msg.innerText = 'กำลังส่งคำขอ...';
+
+    callApi('submitOT', payload).then(function (res) {
+      document.getElementById('submitBtn').disabled = false;
+      if (res.status === 'error') {
+        msg.style.color = '#c62828';
+        msg.innerText = res.message;
+        return;
+      }
+      msg.style.color = '#2e7d32';
+      msg.innerText = 'ส่งคำขอสำเร็จ (' + res.detail + ') รวม ' + res.payHours + ' PayHours — รอหัวหน้าอนุมัติ';
+      setTimeout(function () { liff.closeWindow(); }, 2500);
+    }).catch(function (err) {
+      document.getElementById('submitBtn').disabled = false;
+      msg.style.color = '#c62828';
+      msg.innerText = 'เกิดข้อผิดพลาด: ' + err;
+    });
+  });
+</script>
+</body>
+</html>
