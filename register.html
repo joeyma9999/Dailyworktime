@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  body { font-family: -apple-system, "Segoe UI", "Sarabun", sans-serif; padding: 20px; background:#f5f5f5; }
+  h2 { color:#2e7d32; }
+  label { display:block; margin-top:14px; margin-bottom:4px; font-weight:600; color:#333; }
+  input, select { width:100%; padding:10px; border:1px solid #ccc; border-radius:8px; box-sizing:border-box; font-size:16px; }
+  button { margin-top:20px; width:100%; padding:12px; background:#2e7d32; color:#fff; border:none; border-radius:8px; font-size:16px; }
+  button:disabled { background:#999; }
+  #msg { margin-top:14px; color:#c62828; font-weight:600; }
+</style>
+</head>
+<body>
+  <h2>ลงทะเบียนพนักงาน</h2>
+  <form id="regForm">
+    <label>ชื่อ-นามสกุล</label>
+    <input type="text" id="name" required>
+
+    <label>ธนาคาร</label>
+    <select id="bank" required>
+      <option value="">-- เลือกธนาคาร --</option>
+      <option value="กสิกรไทย">กสิกรไทย</option>
+      <option value="กรุงเทพ">กรุงเทพ</option>
+      <option value="ไทยพาณิชย์">ไทยพาณิชย์</option>
+      <option value="กรุงไทย">กรุงไทย</option>
+      <option value="อื่น">อื่น</option>
+    </select>
+    <input type="text" id="bankOther" placeholder="ระบุชื่อธนาคาร" style="display:none; margin-top:8px;">
+
+    <label>เลขที่บัญชี</label>
+    <input type="text" id="accountNumber" inputmode="numeric" pattern="[0-9]*" required>
+
+    <label>ชื่อบัญชี (ชื่อเจ้าของบัญชีตามหน้าสมุดบัญชี)</label>
+    <input type="text" id="accountName" required>
+
+    <button type="submit" id="submitBtn">บันทึก</button>
+  </form>
+  <div id="msg"></div>
+
+<script>
+  var LIFF_ID = 'YOUR_LIFF_ID_REGISTER';        // TODO: ใส่ LIFF ID ของหน้าลงทะเบียน
+  var API_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL';  // TODO: ใส่ Web app URL จาก Apps Script (…/exec)
+  var userId = null;
+
+  liff.init({ liffId: LIFF_ID }).then(function () {
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+    return liff.getProfile();
+  }).then(function (profile) {
+    if (profile) userId = profile.userId;
+  }).catch(function (err) {
+    document.getElementById('msg').innerText = 'เกิดข้อผิดพลาดในการเชื่อมต่อ LINE: ' + err;
+  });
+
+  document.getElementById('bank').addEventListener('change', function () {
+    document.getElementById('bankOther').style.display = this.value === 'อื่น' ? 'block' : 'none';
+  });
+
+  // ใช้ Content-Type: text/plain เพื่อเลี่ยง CORS preflight (Apps Script ไม่รองรับ OPTIONS)
+  // ตัวเนื้อหายังเป็น JSON อยู่ ฝั่ง Apps Script จะ JSON.parse ได้ตามปกติ
+  function callApi(action, data) {
+    return fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: action, data: data })
+    }).then(function (res) { return res.json(); });
+  }
+
+  document.getElementById('regForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var msg = document.getElementById('msg');
+    if (!userId) { msg.innerText = 'ไม่พบข้อมูลผู้ใช้ LINE กรุณาลองเปิดใหม่อีกครั้ง'; return; }
+
+    var acc = document.getElementById('accountNumber').value;
+    if (!/^[0-9]+$/.test(acc)) { msg.innerText = 'กรุณากรอกเลขที่บัญชีเป็นตัวเลขเท่านั้น'; return; }
+
+    var payload = {
+      lineUserId: userId,
+      name: document.getElementById('name').value,
+      bank: document.getElementById('bank').value,
+      bankOther: document.getElementById('bankOther').value,
+      accountNumber: acc,
+      accountName: document.getElementById('accountName').value
+    };
+
+    document.getElementById('submitBtn').disabled = true;
+    msg.style.color = '#333';
+    msg.innerText = 'กำลังบันทึก...';
+
+    callApi('register', payload).then(function (res) {
+      if (res.status === 'error') {
+        document.getElementById('submitBtn').disabled = false;
+        msg.style.color = '#c62828';
+        msg.innerText = res.message || 'เกิดข้อผิดพลาด';
+        return;
+      }
+      msg.style.color = '#2e7d32';
+      msg.innerText = 'ลงทะเบียนสำเร็จ ✅';
+      setTimeout(function () { liff.closeWindow(); }, 1500);
+    }).catch(function (err) {
+      document.getElementById('submitBtn').disabled = false;
+      msg.style.color = '#c62828';
+      msg.innerText = 'เกิดข้อผิดพลาด: ' + err;
+    });
+  });
+</script>
+</body>
+</html>
